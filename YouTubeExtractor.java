@@ -1,5 +1,3 @@
-package semyon.android.studio.youtube_download;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
