@@ -1,5 +1,3 @@
-package semyon.android.studio.youtube_download;
-
 import android.content.Context;
 import android.content.SharedPreferences;
 
