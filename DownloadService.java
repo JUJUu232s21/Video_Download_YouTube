@@ -1,6 +1,8 @@
+import android.app.DownloadManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -32,7 +34,7 @@ import java.util.concurrent.Executors;
 public class DownloadService extends Service {
 
     public static final String EXTRA_URL = "extra_youtube_url";
-    private static final String CHANNEL_ID = "yt_download_channel";
+    private static final String CHANNEL_ID = "yt_download_channel_v3";
     private static final int NOTIFICATION_ID = 1001;
 
     private ExecutorService executor;
@@ -68,9 +70,11 @@ public class DownloadService extends Service {
                 YouTubeExtractor.VideoResult video = YouTubeExtractor.getDirectMp4Url(youtubeUrl, cookies);
                 downloadFile(video, cookies);
                 showToast("Скачано в Загрузки: " + video.title + ".mp4");
+                showCompletionNotification("Скачано в Загрузки: " + video.title + ".mp4");
             } catch (Exception e) {
                 android.util.Log.e("DownloadService", "Error during download", e);
                 showToast("Ошибка: " + e.getMessage());
+                showErrorNotification("Ошибка: " + e.getMessage());
             } finally {
                 stopSelf(startId);
             }
@@ -132,7 +136,9 @@ public class DownloadService extends Service {
                         int progress = (int) ((downloaded * 100) / totalBytes);
                         if (progress != lastProgress) {
                             lastProgress = progress;
-                            notificationManager.notify(NOTIFICATION_ID, buildNotification("Скачивание: " + video.title, progress, false)
+                            notificationManager.notify(
+                                    NOTIFICATION_ID,
+                                    buildNotification("Скачивание: " + video.title, progress, false)
                             );
                         }
                     }
@@ -179,13 +185,40 @@ public class DownloadService extends Service {
                 .build();
     }
 
+    private void showCompletionNotification(String text) {
+        Intent intent = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Загрузка завершена")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .build();
+        notificationManager.notify((int) System.currentTimeMillis(), notification);
+    }
+
+    private void showErrorNotification(String text) {
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Ошибка загрузки")
+                .setContentText(text)
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setAutoCancel(true)
+                .build();
+        notificationManager.notify((int) System.currentTimeMillis(), notification);
+    }
+
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    "Загрузка видео",
-                    NotificationManager.IMPORTANCE_LOW
-            );
+            NotificationChannel channel = new NotificationChannel( CHANNEL_ID, "Загрузка видео", NotificationManager.IMPORTANCE_DEFAULT);
             notificationManager.createNotificationChannel(channel);
         }
     }
